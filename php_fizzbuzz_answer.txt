@@ -1,0 +1,410 @@
+これは解答用サンプルフォームです。
+以下の4つの項目について記入し、ファイルアップロードで提出してください。
+
+■コードの説明
+どこまでやっていいものか？と思いましたが、とりあえず。。。
+
+・とりあえず、PHP5.4以降で動作確認済み
+・データの配列をforeachでループするのではなく、折角なのでVisitor＋array_walkで処理するパターン
+・除算する数とそれに対応するメッセージは密な関係だと思うので、あえてFizzBuzzSpecificationに両者を持たせるようにした(ホントならfizzbuzz.phpを変更したい)
+・出力部分をWriter化し、Writerを追加することで他の出力方法(ファイルなど)に対応させた
+・コメントはPHP_DocBlockGeneratorを使って手抜き
+
+
+■FizzBuzzApplication.phpのコード
+<?php
+/**
+ * PHP version 5
+ *
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * + Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ * + Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ * + Neither the name of the <ORGANIZATION> nor the names of its contributors
+ * may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author    Hideyuki SHIMOOKA <shimooka@doyouphp.jp>
+ * @license   http://www.opensource.org/licenses/bsd-license.php The BSD License
+ */
+
+namespace CodeIQ;
+
+require_once 'FizzBuzzPrintWriter.php';
+require_once 'FizzBuzzSpecification.php';
+require_once 'FizzBuzzVisitor.php';
+
+/**
+ * FizzBuzzApplication class
+ *
+ * The Main class of FizzBuzz application.
+ */
+class FizzBuzzApplication
+{
+    /**
+     * A FizzBuzzVisitor object
+     */
+    private $visitor;
+
+    /**
+     * Constructor
+     *
+     * @param FizzBuzzVisitor   $visitor    FizzBuzzVisitor object. if not passed,
+     *                                      generate new FizzBuzzVisitor object
+     *                                      with FizzBuzzPrintWriter.
+     */
+    public function __construct(FizzBuzzVisitor $visitor = null)
+    {
+        if ($visitor === null) {
+            $visitor = new FizzBuzzVisitor(new FizzBuzzPrintWriter());
+        }
+        $this->visitor = $visitor;
+    }
+
+    /**
+     * Register specification and related message.
+     *
+     * @param FizzBuzzSpecification $spec       FizzBuzzSpecification object
+     * @param string                $message    a message string related with
+     *                                          FizzBuzzSpecification object
+     */
+    public function addSpecAndMessage(FizzBuzzSpecification $spec, $message)
+    {
+        $this->visitor->addSpecification($spec->setMessage($message));
+    }
+
+    /**
+     * Execute this application
+     *
+     * @param array $data   an array data
+     */
+    public function run(array $data)
+    {
+        array_walk($data, [$this->visitor, 'visit']);
+    }
+}
+
+
+■FizzBuzzSpecification.phpのコード
+<?php
+/**
+ * PHP version 5
+ *
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * + Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ * + Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ * + Neither the name of the <ORGANIZATION> nor the names of its contributors
+ * may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author    Hideyuki SHIMOOKA <shimooka@doyouphp.jp>
+ * @license   http://www.opensource.org/licenses/bsd-license.php The BSD License
+ */
+
+namespace CodeIQ;
+
+/**
+ * FizzBuzzSpecification class
+ *
+ * This class represents each rule of 'fizzbuzz'.
+ */
+class FizzBuzzSpecification
+{
+    /**
+     * the division value
+     */
+    private $divided_by = 1;
+
+    /**
+     * the related message
+     */
+    private $message = null;
+
+    /**
+     * Constructor
+     *
+     * @param   string  $divided_by         division value
+     * @throws  InvalidArgumentException    Throws if the argument is not positive
+     *                                      integer and zero.
+     */
+    public function __construct($divided_by)
+    {
+        if (!preg_match('/^[1-9][0-9]*$/', $divided_by)) {
+            throw new InvalidArgumentException('invalid argument : ' . $divided_by);
+        }
+        $this->divided_by = $divided_by;
+    }
+
+    /**
+     * Return if the specification is satisfied by argument value.
+     *
+     * @param   integer $value  an integer value.
+     * @return  boolean         if the specification is satisfied.
+     */
+    public function isSatisfiedBy($value)
+    {
+        return ($value % $this->getDividedBy() === 0);
+    }
+
+    /**
+     * Return the division value
+     *
+     * @return integer the division value
+     */
+    public function getDividedBy()
+    {
+        return $this->divided_by;
+    }
+
+    /**
+     * Set related message
+     *
+     * @param string    $message        message string
+     * @return FizzBuzzSpecification    this object
+     */
+    public function setMessage($message)
+    {
+        $this->message = $message;
+
+        return $this;
+    }
+
+    /**
+     * Return related message
+     *
+     * @return  string  related message
+     */
+    public function getMessage()
+    {
+        return $this->message;
+    }
+}
+
+
+■その他のコード(FizzBuzzWriter.php)
+<?php
+/**
+ * PHP version 5
+ *
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * + Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ * + Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ * + Neither the name of the <ORGANIZATION> nor the names of its contributors
+ * may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author    Hideyuki SHIMOOKA <shimooka@doyouphp.jp>
+ * @license   http://www.opensource.org/licenses/bsd-license.php The BSD License
+ */
+
+namespace CodeIQ;
+
+/**
+ * Writer interface for FizzBuzz application
+ */
+interface FizzBuzzWriter
+{
+    /**
+     * Output a string argument value
+     *
+     * @param string $value a string data
+     */
+    public function write($value);
+}
+
+
+■その他のコード(FizzBuzzPrintWriter.php)
+<?php
+/**
+ * PHP version 5
+ *
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * + Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ * + Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ * + Neither the name of the <ORGANIZATION> nor the names of its contributors
+ * may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author    Hideyuki SHIMOOKA <shimooka@doyouphp.jp>
+ * @license   http://www.opensource.org/licenses/bsd-license.php The BSD License
+ */
+
+namespace CodeIQ;
+
+require_once 'FizzBuzzWriter.php';
+
+/**
+ * Print writer class for FizzBuzz application
+ *
+ * Output a string argument value into STDOUT.
+ */
+class FizzBuzzPrintWriter implements FizzBuzzWriter
+{
+    /**
+     * Output a string argument value into STDOUT with suffixed PHP_EOL
+     *
+     * @param string $value a string data
+     */
+    public function write($value)
+    {
+        echo $value . PHP_EOL;
+    }
+}
+
+
+■その他のコード(FizzBuzzVisitor.php)
+<?php
+/**
+ * PHP version 5
+ *
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * + Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ * + Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ * + Neither the name of the <ORGANIZATION> nor the names of its contributors
+ * may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author    Hideyuki SHIMOOKA <shimooka@doyouphp.jp>
+ * @license   http://www.opensource.org/licenses/bsd-license.php The BSD License
+ */
+
+namespace CodeIQ;
+
+require_once 'FizzBuzzSpecification.php';
+require_once 'FizzBuzzWriter.php';
+
+/**
+ * FizzBuzzVisitor class
+ *
+ * Test specifications through integer data and output results.
+ */
+class FizzBuzzVisitor
+{
+    /**
+     * FizzBuzzWriter object
+     */
+    private $writer;
+
+    /**
+     * an array of FizzBuzzSpecification object
+     */
+    private $specs = [];
+
+    /**
+     * Constructor
+     *
+     * @param   FizzBuzzWriter  $writer FizzBuzzWriter object
+     */
+    public function __construct(FizzBuzzWriter $writer)
+    {
+        $this->writer = $writer;
+    }
+
+    /**
+     * Register specification and related message.
+     *
+     * @param FizzBuzzSpecification $spec   FizzBuzzSpecification object
+     */
+    public function addSpecification(FizzBuzzSpecification $specification)
+    {
+        $this->specs[] = $specification;
+    }
+
+    /**
+     * Test specifications against an integer value and output results
+     *
+     * @param integer   $value  an integer value
+     */
+    public function visit($value)
+    {
+        $result = $value;
+
+        foreach ($this->specs as $specification) {
+            if ($specification->isSatisfiedBy($value)) {
+                $result = $specification->getMessage();
+                break;
+            }
+        }
+
+        $this->writer->write($result);
+    }
+}
